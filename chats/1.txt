@@ -1,0 +1,1670 @@
+ ▐▛███▛█   Claude Code v2.1.322
+▝▜██████▀  Opus 5.5 · Claude Pro
+ ▝▝   ▝▝   ~/.steam/debian-installation/steamapps/common/Dome Keeper
+
+⚠ Your login expires in 3 days · run /login to renew
+
+  Fable 5.2 is here for your longest and toughest coding tasks, and is included in your plan until November 16. It draws down usage faster than Opus 5.5. You also get a free Fable limit reset to redeem at clau.de/reset by November 16. Switch with /model.
+
+❯ /model                                                                        
+  ⎿  Set model to Opus 5.5 and saved as your default for new sessions
+
+❯ this is the steam install of domekeeper that I own.  I'm interested in        
+  improving my gameplay so I'd like to learn more about supplement/gadget       
+  locations generation.                                                         
+                                                                                
+  could we look at these files for the map generation logic and generating e.g. 
+  thousands of maps to analyze in post?  host cop has a good cpu/gpu            
+  available.                                                                    
+                                                                                
+  ask any questions up front                                                    
+
+● I'll take a quick look at the install first so my questions are based on
+  what's actually there.
+
+  Searched for 1 pattern, ran 5 shell commands (ctrl+o to expand)
+
+● I've had a quick look. What I found:
+
+  - Engine: Godot 4.3.1 (custom build). The game logic is compiled GDScript
+    bytecode (.gdc) inside domekeeper.pck, which is 1.25 GB. There are no native
+    generator libraries, so the full logic should be recoverable.
+  - Relevant scripts: content/map/generation/MapArchetype.gdc,
+    TileDataGenerator.gdc, content/map/MapData.gdc and Map.gdc, plus the chamber
+    types under content/map/chamber/ (gadget/, supplement/PowerCoreChamber,
+    relic/, relicswitch/, gift/, nest/). Game modes are under content/gamemode/
+    (relichunt, prestige, assignments).
+  - cop: 128 threads, 125 GB RAM and an RTX 4070. That's plenty. Map generation
+    will almost certainly be CPU-only GDScript, so the work splits across cores,
+    one process per core. The GPU probably won't help.
+
+  My plan: decompile the scripts with GDRE Tools (gdsdecomp). Then read the
+  generator to see how seeds turn into chamber and gadget placement. Then run
+  the game's own generator headless on cop, thousands of seeds in parallel, and
+  dump each map's tiles and chamber positions to parquet. Using the real code
+  instead of a port means the RNG and edge cases match the game exactly.
+
+  Questions before I start:
+
+  1. Decompiler: OK to download GDRE Tools from its GitHub releases? It's a
+     third-party binary. I'd keep it, and the extracted files, in their own
+     folder and use them only on your copy of the game.
+  2. Which runs? Map layout probably depends on game mode, map size and
+     difficulty, and maybe on dome/keeper and unlocks. Do you want one specific
+     setup, e.g. Relic Hunt, medium map, a particular keeper? Or should I sweep
+     across all of them?
+  3. What's the gameplay question? For example:
+     - Where gadget and supplement chambers sit by depth and distance from the
+       dome
+     - Whether their positions correlate with things you can see early, like the
+       relic, cave types or resource clusters
+     - Expected drill cost to reach the nearest N gadgets
+     - Something else
+
+     Your answer decides what I record for each map. If you can see the seed
+     during a run, I could also build a "show me this seed's map" lookup.
+  4. Fallback: the binary is a custom build, so the stock Godot 4.3 runtime
+     might not load the decompiled project cleanly. If that happens, which do
+     you prefer?
+     - Use the game's built-in mod loader (mod_tool) to run the generator inside
+       the real game binary
+     - Port the generator to Python/numpy, which is faster to iterate on but
+       carries a small risk of not matching the game exactly
+  5. Output: is parquet plus a Jupyter/Python analysis on cop fine? Or do you
+     also want a visual report, such as heatmaps of chamber locations?
+
+✻ Crunched for 1m 19s · done Monday 10:59 PM
+
+❯ 1. yes on cop, workdir in ~/resources/domekeepermaps                          
+  2. maybe queue all of them, but start with guild challenge "projectile hell"  
+  hard difficulty                                                               
+  3. where theyre located, and generation patterns.  expensive to just save the 
+  full map tiling?                                                              
+  4. maybe port to cupy for gpu util.                                           
+  5. yes, and would like a heatmap showing gadget/supplement locations          
+
+● On full tiling: a map is probably on the order of 100×200 tiles at one byte
+  per tile (I'll confirm once I've read the generator). That's about 20 KB per
+  map before compression, so 10k maps is around 200 MB. Saving everything is
+  cheap.
+
+  Starting with setup on cop.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● cop has 61 GB free, so I'll recover only the scripts and resource files
+  (.tres/.tscn) and skip textures and audio.
+
+  Ran 2 shell commands (ctrl+o to expand)
+  ⎿  1 action blocked by auto mode
+     │ Auto mode: [Code from External]
+
+● I'm stopped at the decompile step. The game files and GDRE Tools v2.7.4 are on
+  cop under ~/resources/domekeepermaps/{game,tools}/, but the auto-mode
+  permission check blocked me from running the downloaded GDRE binary, even with
+  --help. I won't try to get around that, so you'll need to choose how to
+  proceed:
+
+  Option A: you run it. Type this in the prompt so the output lands here:
+  ! ssh cop '~/resources/domekeepermaps/tools/gdre_tools.x86_64 --headless 
+  --help 2>&1 | head -80'
+  After that I'll give you the exact recover command, limited to scripts and map
+  resources, using the flag names this version actually has.
+
+  Option B: allow it for this session. Add a permission rule for Bash(ssh cop 
+  *gdre_tools*), through /permissions or the update-config skill, and I'll do
+  the extraction myself.
+
+  Once the scripts are decompiled, the next steps are:
+  1. Read MapArchetype, TileDataGenerator, MapData and the chamber scripts, and
+     find how the guild-assignment config, "projectile hell" on hard, feeds the
+     generator.
+  2. Port it to CuPy. Seeded RNG must match Godot's PCG32, so I'll check the
+     port against the real generator on a few seeds, maps generated headless or
+     from a run you've played.
+  3. Generate a batch, save full tilings and chamber lists to parquet, and build
+     the gadget/supplement heatmaps.
+
+✻ Cooked for 5m 8s · done Monday 11:09 PM
+
+※ recap: We're mapping where Dome Keeper puts gadgets and supplements, starting with projectile hell on hard. The decompile on cop is waiting because running the downloaded GDRE Tools binary was blocked, so please run the help command I posted or allow `ssh cop *gdre_tools*`. (disable recaps in /config)
+
+❯ try again, Ill approve                                                        
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+● All 871 scripts decompiled, with no failures. I'll pull a copy to my
+  scratchpad so I can read it locally.
+
+  Read 2 files, ran 1 shell command (ctrl+o to expand)
+
+● That's the core generator. Next I need to find where it's called and how the
+  guild-assignment config picks its archetype.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● The developers shipped their own map tool
+  (tool/MapGeneration/MapArchetypeBuilder.gd). Now I'll find where the game
+  itself calls the generator, and the "projectile hell" config.
+
+  Read 1 file, ran 5 shell commands (ctrl+o to expand)
+
+● Still tracing the "projectile hell" config. The assignment definitions are in
+  a data file I didn't extract yet.
+
+  Ran 3 shell commands (ctrl+o to expand)
+
+● Projectile Hell uses the default assignment archetype, and hard mode only
+  changes monster properties, so the map distribution matches normal. Next I'll
+  check the archetype values, world modifiers, and chamber and cave placement. 
+  · summary
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Projectile Hell's world modifiers leave the map alone, but its supplement
+  chamber count depends on which guild supplements are unlocked in your save.
+  I'm checking the chamber contents and seed source next. · summary
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● The seed is a 32-bit randi(), with failed generations retrying at a fixed
+  offset. Your game logs may already hold the per-run generator report, which
+  would let me check against ground truth; I'm checking now. · summary
+
+  Ran 3 shell commands (ctrl+o to expand)
+
+● You have two logged runs on assignment-default with known seeds to check
+  against, and the supplement is now unlocked in your save. · summary
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● The save files are encrypted, so I can't read your supplement unlocks from
+  them. I'm turning the supplement count into a parameter and checking the
+  generator's dependencies next. · summary
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● The CuPy port is risky because the generator depends on TileMap cell ordering,
+  sort tie-breaking, and float32/float64 mixing, and much of it is sequential.
+  I'll first benchmark the original GDScript headless on cop's 128 threads. 
+  · summary
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+● I need the generator scene (TileDataGenerator.tscn) to copy its TileMap layer
+  setup faithfully. It's stored as a binary .scn, so I'll extract it and convert
+  it to text.
+  Ran 2 shell commands (ctrl+o to expand)
+
+● The generator scene instances MapData.tscn, so I need that one's TileMap layer
+  and tileset setup too.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● The MapData TileMap has the three layers and tileset needed, so I'll build a
+  minimal headless harness around the game's unmodified generator scripts with
+  small stubs for their dependencies, and fetch the official Godot 4.3-stable
+  headless binary on cop. · summary
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Now the harness. The game's generator files are copied in unmodified, and only
+  the stubs and the runner are new:
+
+  Ran 3 shell commands (ctrl+o to expand)
+
+● I'm writing the runner now, mirroring LandingStage's retry logic and emitting
+  int8 grids for the three layers plus per-map JSONL metadata. · summary
+
+  Made 1 scratchpad edit +158 (ctrl+o to expand)
+
+● First test: reproduce your two logged runs.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Two harness issues, neither in the game code: I need to copy over some relaxed
+  GDScript warnings from project.godot, and I'll load the generator at runtime
+  because the runner's preload runs before the autoloads exist. · summary
+
+  Ran 3 shell commands (ctrl+o to expand)
+
+● The biome sizes and tile counts match the game exactly, so the engine's RNG
+  and cell ordering line up. Speed is fine at about 0.65 s per map per core, so
+  I'm staying on the real code and moving on to the batch launcher and the
+  game's "chamber position" definition. · summary
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+● I'm using cop's base miniconda3 Python, which already has the needed
+  libraries, and next I'll write the seed generator, parallel launcher, and
+  post-processing scripts. · summary
+
+  Made 2 scratchpad edits +164 (ctrl+o to expand)
+
+● Smoke test: 500 Projectile Hell maps with the supplement cap at 3, the most
+  you can have.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● The pipeline ran 500 maps with none failing, each holding its expected
+  chambers and relics. Throughput was lower than projected, probably from Godot
+  startup overhead in the 4-map chunks, and I'm checking that next. · summary
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Each map takes 13 s with 120 running in parallel, versus 0.65 s alone, a 20×
+  slowdown that 64 cores shouldn't cause. I'm checking for other load on cop and
+  whether each Godot process spawns its own full thread pool. · summary
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Each Godot process starts 134 threads, mostly an idle worker pool sized to the
+  machine. I'll measure how per-map time scales with the number of parallel
+  processes, with and without a capped pool.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Throughput plateaus at about 16 maps/s from 16 processes onward. That looks
+  like an external cap, not CPU contention. Checking cgroup CPU limits on cop:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Your user slice on cop is capped at 16 CPUs by a cgroup quota, so about 20k
+  maps should take roughly 20 minutes at 16 processes. I'm starting the main
+  Projectile Hell batch in the background now, with supplements capped at 3. 
+  · summary
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● While that runs, I'll build the heatmap analysis against the 500-map smoke
+  batch. Loading the charting guidance first:
+
+● Skill(dataviz)
+  ⎿  Successfully loaded skill
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● I'm writing an analysis script that heatmaps chamber positions over 20k maps
+  and checks two suspected patterns in the generator: gadget chambers pulled
+  toward nearby iron, and successive gadgets alternating sides. · summary
+
+  Made 2 scratchpad edits +151 -2, ran 1 shell command (ctrl+o to expand)
+
+● Two patterns show up in the 500-map sample: gadgets alternate sides 91–99% of
+  the time and lean right at 65%, and they end up no closer to iron than random
+  dirt. I'm checking the figures next. · summary
+
+  Read 2 files (ctrl+o to expand)
+
+● Gadget bands sit near depths 13, 33 and 53 on alternating sides, and
+  supplements near 19, 38 and 58. I'm tightening the heatmap layout next to cut
+  the empty space above the panels. · summary
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● While that runs, I'll build the queue for all other modes. Each distinct
+  (archetype, relic count) combination is its own map distribution, so I'm
+  collecting those:
+  Ran 1 shell command (ctrl+o to expand)
+
+● World modifiers can also change archetype fields (propertyChange.keyClass == 
+  "archetype"), so I need to check which ones do:
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+● The generator places gadgets and supplements before relics, cobalt and holes,
+  so relic count, cobalt rate and the supplement cap can't affect them; only the
+  archetype matters, with one batch per archetype. · summary
+
+  Made 1 scratchpad edit +32, ran 2 shell commands (ctrl+o to expand)
+
+● The main batch is running: about 48 of 200 chunks started, roughly 15 minutes
+  left. The queue for the other modes will start automatically when it finishes.
+  I'll wait for the completion notice.
+
+✻ Cooked for 16m 26s · done Monday 11:43 PM
+
+※ recap: We're mapping where gadget and supplement chambers spawn, using the game's own generator, which exactly reproduced your two logged runs. 20,000 Projectile Hell maps are generating on cop. Next, I'll build the heatmaps once it finishes, and the other modes are queued after it. (disable recaps in /config)
+
+● Background command "Generate 20k Projectile Hell maps on cop" completed (exit
+code 0)
+
+  Read 1 file, ran 1 shell command (ctrl+o to expand)
+
+● I ran 20,000 Projectile Hell maps through the game's own generator on cop.
+  Gadget and supplement chambers spawn in tight, predictable depth bands.
+  Nothing failed: every map has 3 gadget chambers, 3 supplement chambers, 1
+  relic and about 4 relic switches. Your two logged runs (seeds 458828460 and
+  1521161624) came out with exactly the same tile counts and biome sizes as
+  in-game, so the data should match real maps.
+
+  Placement patterns (depth in tiles below the dome, x = tiles left or right):
+
+  ┌────────────┬─────────────────┬─────────────┬──────────────────────────┐
+  │            │ Depth (median)  │  Distance   │           Side           │
+  │            │                 │ from centre │                          │
+  ├────────────┼─────────────────┼─────────────┼──────────────────────────┤
+  │ Gadget 1   │ 13 (almost all  │ ~5          │ right 61% of the time    │
+  │            │ 12–15)          │             │                          │
+  ├────────────┼─────────────────┼─────────────┼──────────────────────────┤
+  │ Gadget 2   │ 33              │ ~11         │ opposite side to gadget  │
+  │            │                 │             │ 1, 91%                   │
+  ├────────────┼─────────────────┼─────────────┼──────────────────────────┤
+  │            │                 │             │ opposite side to gadget  │
+  │ Gadget 3   │ 53              │ ~14         │ 2, 97%, so usually       │
+  │            │                 │             │ gadget 1's side          │
+  ├────────────┼─────────────────┼─────────────┼──────────────────────────┤
+  │ Supplement │ 19              │ ~15         │ 50/50, unrelated to the  │
+  │  1         │                 │             │ gadgets                  │
+  ├────────────┼─────────────────┼─────────────┼──────────────────────────┤
+  │ Supplement │ 38              │ ~12         │ opposite side to         │
+  │  2         │                 │             │ supplement 1, 98%        │
+  ├────────────┼─────────────────┼─────────────┼──────────────────────────┤
+  │ Supplement │ 58              │ ~16         │ opposite side to         │
+  │  3         │                 │             │ supplement 2, 97%        │
+  ├────────────┼─────────────────┼─────────────┼──────────────────────────┤
+  │            │ about 8 tiles   │ far out at  │                          │
+  │ Relic      │ above the map   │ the sides   │ leans right              │
+  │            │ bottom          │             │                          │
+  └────────────┴─────────────────┴─────────────┴──────────────────────────┘
+
+  The side alternation and the right lean come straight from the generator code
+  (resourceX = -sign(previous.x)·… plus a positive random offset). How to use
+  it: once you find gadget 1, you know which side gadgets 2 and 3 are on and
+  roughly how deep.
+
+  Things that don't change these positions:
+  - Hard difficulty: challenge mode only changes monster settings.
+  - Your supplement cap: your unlocks limit how many supplement chambers spawn,
+    but the ones that do spawn are in the same places as in the table. Your save
+    file is encrypted, so I couldn't read how many you have.
+  - Relic count and cobalt rate: these are generated after the chambers.
+  - Iron: chambers are pulled toward iron during generation, but in the finished
+    map they're no closer to iron than random dirt is. Iron isn't a useful
+    clue.
+
+  On your questions:
+  - Saving full maps is cheap. All 20k complete tilings (biome, hardness and
+    resource layers) take 69 MB compressed.
+  - I didn't do the CuPy port. Your account on cop is capped at 16 CPUs by the
+    system, so the 128 threads aren't available. Even so, 20k maps took about 21
+    minutes. A port would have to copy Godot's tile ordering, sort behaviour
+    and float precision exactly or the maps would quietly differ. It's only
+    worth it if you want millions of maps.
+
+  Still running on cop: batches for all the other modes. That's 9
+  guild-assignment map types, Relic Hunt small/medium/large/huge, and Prestige
+  10k/20k. Each batch saves the same outputs plus its own heatmaps; progress is
+  in data/queue_all.log. I left out Relic Hunt runs with optional world
+  modifiers like deep, wide or hard rock, because those change the map shape.
+
+  The heatmap image is /tmp/claude-1000/-home-evan--steam-debian-installation-st
+  eamapps-common-Dome-Keeper/b15ebbc1-7d54-4504-a1c0-8c449b648382/scratchpad/fig
+  s/heatmap_chambers.png, with a depth-by-rank chart next to it.
+
+  Everything is in ~/resources/domekeepermaps on cop:
+  - data/projhell_pc3/:
+    - tiles.npz (full maps)
+    - maps.parquet
+    - chambers.parquet (one row per chamber, with seed, position, biome and
+      hardness)
+    - stats.json
+    - figs/
+  - harness/runner.gd: the headless runner around the unmodified game scripts
+  - scripts/: run_batch.sh, postprocess.py, analyze.py, queue_all.sh,
+    validate.sh
+
+✻ Worked for 44s · done 12:01 AM
+
+※ recap: We're studying where Dome Keeper spawns gadgets and supplements; 20k Projectile Hell maps are done and heatmapped on cop, and the other modes are generating now. Next, I'll analyze those batches once they finish. (disable recaps in /config)
+
+❯ are there just 3 map sizes, so that these prob. maps could be only 3          
+  configurations?                                                               
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Not quite. Map size isn't one global setting: each mode loads its own map
+  template (an "archetype"), so there are more than 3 configurations. Many of
+  them share the same layout parameters, though:
+
+  Group: Guild assignments (most)
+  Map templates: default (Projectile Hell and ~15 others), maze, dense-iron,
+    rare-iron, hardrock, acidrain, tree-farm, logistics
+  Size (width × depth, tiles): 65×75, 4300 tiles
+  Gadgets / supplements: 3 / 3
+  First gadget depth, spacing: 15, +18
+  ────────────────────────────────────────
+  Group: Guild: Minor Vision
+  Map templates: minorvision
+  Size (width × depth, tiles): 80×60
+  Gadgets / supplements: 3 / 3
+  First gadget depth, spacing: 15, +18
+  ────────────────────────────────────────
+  Group: Guild: Big Map Sparse Resources
+  Map templates: softrock-sparseresources
+  Size (width × depth, tiles): 85×100, 8000 tiles
+  Gadgets / supplements: 3 / 3
+  First gadget depth, spacing: 15, +18
+  ────────────────────────────────────────
+  Group: Relic Hunt
+  Map templates: small / medium / large / huge
+  Size (width × depth, tiles): 40×40 → 70×100
+  Gadgets / supplements: 2/0, 2/1, 3/2, 4/3
+  First gadget depth, spacing: 15, +17 to +20
+  ────────────────────────────────────────
+  Group: Prestige
+  Map templates: 10k / 20k
+  Size (width × depth, tiles): 80×125, 85×200
+  Gadgets / supplements: 5/4, 6/5
+  First gadget depth, spacing: 15, +17/+20
+
+  So the main groups are guild (one dominant config), Relic Hunt (4 sizes) and
+  Prestige (2).
+
+  Some things make it less clean than that:
+  - Guild templates with the same size still differ. They change iron density,
+    the shape noise (maze) and hardness. Gadgets are placed using iron positions
+    and the map's outline, so their heatmaps should look alike but not
+    identical. The queued batches will show how much they actually differ.
+  - Some settings rescale the map. Co-op multiplies depth by 1.4 and width by
+    1.3, and pushes gadgets deeper (first depth ×1.5, spacing ×1.8). Having more
+    than one keeper also scales the map. The optional Relic Hunt world
+    modifiers do too: "deep" and "wide" change width and depth, and a few others
+    change iron and hardness. None of these are in the current queue.
+  - Each heatmap is a spread, not a fixed layout. Within one template every seed
+    has a different cave outline. The bands show where chambers can land:
+    within ±2 tiles of depth for gadget 1, wider for the deeper ones.
+
+  So in practice: one set of heatmaps covers almost all guild assignments, plus
+  the 4 Relic Hunt sizes and 2 Prestige sizes. I can queue co-op and the Relic
+  Hunt modifiers if you play those.
+
+✻ Worked for 26s · done 12:14 AM
+
+❯ could we generate a zoomable static HTML app that shows probability           
+  distributions of various things overlayed onto a realistic map (uses game     
+  tiles) and the top bar has controls/dropdown for choosing game mode?          
+                                                                                
+  I know maps are random, so the background map is more of a style aspect (but  
+  it should be sampled from correct dist)                                       
+                                                                                
+  should also have a vertical/horizontal ruler that shows tiles and on hover.   
+                                                                                
+  ask any questions up front                                                    
+
+● I'll check how the game draws tiles first, so my questions are grounded in
+  what's possible.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● The game doesn't draw tiles from simple sprites. It builds them with shaders
+  (tile_material, background_gradient_add, resource_edge_fade, cracks,
+  tile_occlusion) on top of a tileset and biome textures, so "realistic" can
+  mean different amounts of work. My questions:
+
+  1. Hosting. Game textures are copyrighted, so I'd keep this as a local static
+     HTML file (opened from disk or served from cop) rather than publishing it
+     as a claude.ai artifact. Is local OK? I could also publish a separate copy
+     with stylized, non-game tiles if you want a shareable link.
+  2. Background fidelity:
+     - (a) Close approximation: extract the game's biome, border and resource
+       textures and composite them per tile in a canvas. Biome colour, hardness
+       shading, and iron/water/cobalt/chamber sprites would all look like the
+       game, but without the shader effects (edge fades, lighting, occlusion).
+     - (b) Real renders: run the game's actual Map scene in Godot with the GPU
+       on cop (cop has no display, so a virtual one via xvfb), fully revealed,
+       and screenshot it. This is pixel-accurate but much more work, and might
+       not pan out because the scene depends on many game systems.
+
+     I'd start with (a) and try (b) later if it isn't good enough.
+  3. Overlay layers. My default list:
+     - gadget, supplement, relic and switch chambers
+     - each gadget/supplement by rank (1st, 2nd, 3rd)
+     - iron/water/cobalt density
+     - mean hardness
+     - the chance a tile is inside the map at all
+
+     Two options on top:
+     - Caves (the drillbert cave, seed cave and other special caves). These
+       aren't in the data yet; I'd need to add the game's cave placement step.
+     - Conditional mode: click where you found gadget 1 (or supplement 1) and
+       the overlays update to show where the remaining chambers are likely to
+       be, given that. This is probably the most useful feature in actual play,
+       and the alternating-sides pattern makes it work well.
+
+     Want either or both?
+  4. Modes in the dropdown. Should it include just what's queued (9 guild
+     templates, Relic Hunt small/medium/large/huge, Prestige 10k/20k), or also
+     co-op and the Relic Hunt world modifiers like deep and wide? Those last two
+     need new batches. I could also merge the guild templates that turn out
+     statistically identical into one entry.
+  5. Background map. The plan is a few dozen real generated maps per mode
+     embedded in the page, with a "reroll" button and the seed shown. Since
+     they're real generator output, they come from the correct distribution.
+     Does that work, or do you want one fixed map per mode?
+
+✻ Worked for 33s · done 12:23 AM
+
+❯ 1. yes local                                                                  
+  2. just a default biome with just basic effects is OK.  keep it simple but    
+  pretty is good                                                                
+  3. ok.  before you begin, is anything conditional besides the                 
+  gadget/supplement placement?                                                  
+  4. should have all guild challenges (because people know challenge names, not 
+  their maps).  coop and modifiers as long as theyre easy                       
+  5. isnt one map ok?                                                           
+                                                                                
+  answers first.  short                                                         
+
+● 3. What else is conditional:
+  - Relic switches depend strongly on the relic. They're 7–14 tiles from it,
+    usually left/right or below it. Once you find the relic, the switches are
+    well localized, and the reverse works too.
+  - The relic depends weakly on map shape. It's always about 8 tiles above the
+    template's bottom (about depth 67 here). Left vs right depends on where the
+    iron is.
+  - Supplements vs gadgets: nearly independent (46% same side), apart from not
+    overlapping.
+  - Iron, water and cobalt repel each other, so seeing one tells you a little
+    about nearby tiles. That's too weak to be worth showing.
+  - Caves are placed by biome layer, so seeing a biome boundary would narrow
+    them down. That would only matter if I add caves.
+
+  So the conditional mode would cover the gadget chain, the supplement chain,
+  and relic ↔ switches.
+
+  4. OK. I'll list all ~25 guild challenges by name, mapped to their templates.
+  Co-op is easy, it's just a scaling. The deep/wide-type modifiers are easy too,
+  since they only change template values.
+
+  5. Yes, one map per mode is fine.
+
+  Should I go ahead?
+
+✻ Sautéed for 13s · done 12:27 AM
+
+❯ 3. I think just a note that the items almost always alternate sides is enough 
+                                                                                
+  continue                                                                      
+
+● Going ahead with one map per mode and a note that items almost always
+  alternate sides. First, the queue status and the full list of modifiers:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● The queue is on its first assignment batch. Now, which modifiers can actually
+  be picked in Relic Hunt and co-op:
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+● Relic Hunt's map-generating modifiers (seven of them) times 4 sizes and co-op
+  make about 48 configurations, so I'm adding an --op=key*=value option to apply
+  the game's operators in order. · summary
+
+  Read 1 file, ran 1 shell command (ctrl+o to expand)
+
+● run_batch.sh currently turns every extra argument into --set=…, so it needs to
+  pass --op= through unchanged. Then a quick check that the operators truncate
+  the way the game does:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● That rsync --delete also wiped the .godot class cache on cop, which the
+  running queue's Godot processes need. Rebuilding it now and checking whether
+  any chunks failed in the gap:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Truncation now matches the game (50×1.09 → 54, 15×1.5 → 22), and future syncs
+  will exclude .godot. I'm replacing the slow 10k-map queue with one shared
+  config list for guild challenges, Relic Hunt, co-op and Prestige, at 2–3k maps
+  each, starting with the in-game names. · summary
+
+  Ran 4 shell commands (ctrl+o to expand)
+
+● The modifier names come from ModifiersBox.gd. hardrock, deep and wide have no
+  display names, so they may not be selectable at all. Checking the actual list:
+
+  Ran 1 shell command (ctrl+o to expand)
+● Only Maze, Triple Supplements and No Monsters are player-selectable map
+  modifiers, bringing the total to about 29 configurations. Next I'm pulling up
+  the shared config list. · summary
+
+  Made 1 scratchpad edit +92, ran 1 shell command (ctrl+o to expand)
+
+● Two of the 30 configurations are done (guild_default and guild_maze, the
+  latter still running); I'm moving on to the queue driver and the switch off
+  the old queue next. · summary
+
+  Made 1 scratchpad edit +31, ran 2 shell commands (ctrl+o to expand)
+
+● Background command "Queue all-mode batches on cop after main batch" completed
+(exit code 0)
+
+● The queue is switched over. The old SSH session that just ended is the one I
+  killed, which is expected.
+
+  Now the app. To get a realistic background I need to see how the game textures
+  tiles:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Rendering goes through a shader pipeline (the MainStones material plus
+  generated biome, hole and noise textures). I'll pull the textures that
+  material references and composite a simplified version.
+
+  Ran 6 shell commands (ctrl+o to expand)
+
+● I've pulled the game's rock tile textures (one per hardness level) and the
+  cave background. Viewing them to choose a simple compositing approach:
+
+  Read 2 files, ran 1 shell command (ctrl+o to expand)
+
+● The rock textures are index masks: yellow for fill, red for outline. The game
+  recolors them through a palette in its shader. Checking the palette image to
+  get real stone colors:
+
+  Read 2 files, ran 1 shell command (ctrl+o to expand)
+
+● I'm recoloring the game's rock masks in a simple game-style palette and
+  writing a build script that outputs static per-config data files and
+  backgrounds loadable via script tags. · summary
+
+  Made 1 scratchpad edit +238 (ctrl+o to expand)
+
+● Testing the render on one config (guild_default) before writing the frontend:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● The guild_default symlink isn't there yet because the queue script creates it
+  after the maze batch. Creating it now (the queue's ln -sfn later is
+  idempotent):
+
+  Read 2 files, ran 2 shell commands (ctrl+o to expand)
+
+● The render looks right, with the rock patterns, glyphs, chamber outlines and
+  dug caves all showing correctly. I'm giving relic switches pink outlines so
+  they stand apart from the gold gadget chambers, and the frontend is next. 
+  · summary
+
+  Made 3 scratchpad edits +794, ran 1 shell command (ctrl+o to expand)
+
+● Now a local test: combine the frontend with the one built config and
+  screenshot it in headless Chrome.
+
+  Read 1 file, ran 2 shell commands (ctrl+o to expand)
+
+● The layout and legend render correctly, so I'm fixing three things:
+  pre-scaling the overlay 4× to remove the blur, dropping rare ranks under 1% of
+  maps to clear the odd 4th-supplement row, and tightening the top bar so it
+  stops wrapping. · summary
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● That max_rank line is unreadable. Rewriting it properly:
+
+  Made 1 scratchpad edit +5 -4, read 3 files, ran 1 shell command (ctrl+o to expand)
+
+● Hover, rulers and the tile highlight are working; I'll render the overlay at
+  the map's full 24 px per tile and lower its default opacity to fix the
+  softness when zoomed in. · summary
+
+  Read 1 file, ran 1 shell command (ctrl+o to expand)
+
+● The overlay is now crisp per tile. The frontend is done; what's left is
+  waiting for the remaining batches, then running the full build. Checking queue
+  progress:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● The 10k maze batch is nearly done, and the remaining 28 configs should take
+  about two hours. Next I'll set up a background job to build the app on cop and
+  sync it to ~/resources/domekeepermaps/app here. · summary
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+● While the queue runs, I'm smoke-testing the untested config types (co-op ops,
+  the Maze noise swap, Triple Supplements) on a few seeds so a typo won't stall
+  it midway. · summary
+
+  Ran 1 shell command (ctrl+o to expand)
+  ⎿  Interrupted · What should Claude do instead?
+
+❯ would be nice if the map theme could coursely follow the game theme or        
+  wiki.gg: https://domekeeper.wiki.gg/wiki/Dome_Keeper                          
+                                                                                
+  @/tmp/dome.webp                                                               
+  ⎿  Read ../../../../../../../tmp/dome.webp (15.7KB)
+
+● I'll sample the actual colors from your screenshot so the theme matches the
+  pause menu.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+❯ app theme                                                                     
+● Got it, the theme is for the app UI, not the map render. I still need the
+  title, border and text colors:
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+● I've set the pause-menu palette and font plan, with Pixelify Sans for the
+  pixel text and monospace for numbers, and I'm rewriting the stylesheet next. 
+  · summary
+
+  Made 1 scratchpad edit +189, read 1 file (ctrl+o to expand)
+
+● Adding the font link, then re-screenshotting:
+
+  Read 2 files, ran 1 shell command (ctrl+o to expand)
+
+● The theme now matches the pause menu, with dark purple panels, pink-bordered
+  controls, and the Pixelify Sans font. I'm tightening the top bar next, since
+  it still wraps at 1500 px. · summary
+
+  Read 1 file, ran 1 shell command (ctrl+o to expand)
+
+● I restyled the app to match the game's pause menu from your screenshot. Only
+  the layout and controls changed, not the map render:
+
+  - Colors: sampled from your screenshot. Dark purple background and panels,
+    uppercase purple title and headings, cream text.
+  - Controls: buttons, dropdowns and layer chips have the double pink/mauve
+    border; a selected item gets the brighter edge. The rulers, tooltip and zoom
+    buttons use the same frame.
+  - Font: Pixelify Sans, a pixel font similar to the game's, for labels and
+    headings. It loads from Google Fonts when you're online and falls back to
+    the normal system font otherwise. Numbers stay monospace so they're easy to
+    read.
+
+  I worked from your screenshot only and didn't fetch the wiki.gg page; it uses
+  similar dark purples. At 1500 px wide the controls still drop below the title.
+  That reads fine as a header, and on wider screens it fits on one line.
+
+  You stopped my test run of the config types that haven't been generated yet,
+  and I haven't re-run it. That leaves a risk: if one of those configs has a
+  typo, the queue stops at that batch. I'd see it in the queue log and fix it.
+
+  The generation queue is still running on cop, roughly 2 hours for the
+  remaining 28 configs. A background job here waits for it to finish, builds the
+  app from every batch with the new theme, and copies it to
+  ~/resources/domekeepermaps/app/index.html on this machine. I'll tell you when
+  it's there. In the meantime the themed Projectile Hell–only version is at
+  /tmp/claude-1000/-home-evan--steam-debian-installation-steamapps-common-Dome-K
+  eeper/b15ebbc1-7d54-4504-a1c0-8c449b648382/scratchpad/app_test/index.html.
+
+✻ Cogitated for 2m 1s · done 12:45 AM
+
+❯ did you redraw the art by hand?  it doesnt match the game very well.  one     
+  sentence                                                                      
+
+● The rock patterns are the game's own textures, but I recolored them with my
+  own guessed palette instead of the game's palette shader, and I drew the
+  iron/water/cobalt and chamber markers myself, so that's why it doesn't look
+  like the game.
+
+✻ Churned for 4s · done 12:47 AM
+
+● Background command "Wait for cop queue, then build and sync app" completed
+(exit code 0)
+
+  Listed 1 directory (ctrl+o to expand)
+
+● The queue halted after one batch because analyze.py crashes on configs with no
+  relic, and only 3 of 30 configs got through. I'm fixing that crash, making a
+  failed figure stop halting the queue, and restarting it. · summary
+
+  Ran 1 shell command (ctrl+o to expand)
+
+❯ use the game's actual palette and sprites instead.  also we can show the map  
+  as if "reveal resources" was done, (i.e. all empty rock tiles mined)          
+                                                                                
+  which dropdown unnecessary                                                    
+  mean hardness seems to just be 2 everywhere?                                  
+                                                                                
+  can we use the game menu font, if you can find it?                            
+
+● The inner ssh cop in that command ran on cop itself, which can't resolve its
+  own hostname. That error is harmless. Checking whether the queue actually
+  restarted:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● The queue is running again on Dense Iron. Mean hardness stays about 2 because
+  the generator rebalances it on every map, so I'm removing that setting and the
+  "Which" dropdown, and I'm now checking the palette, sprites and font files. 
+  · summary
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+● I'm recovering the border sprite sheet, the chamber sprites, the ground and
+  rock tiles, the bundled fonts, shaders, and menu font resources next. 
+  · summary
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Now which of those fonts the menu buttons actually use:
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+● The menu font is Kollektif (gui/fonts/Kollektif.ttf), with Noto Sans as the
+  fallback. I'll bundle it with the app. Next, the map shader, so the render can
+  use the game's real palette:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● The stone shader's color comes from a per-biome map, and the game's art
+  appears to be drawn in index colors that a final palette pass remaps. I'll
+  build the image in index colors and check how Style performs that remap. 
+  · summary
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+● I'm using a fixed lookup from palette PNG cell centers so the mapping works
+  offline. Next I'll check the step constants, the biome stone colors, and the
+  sprites that draw resources and chambers. · summary
+
+  Ran 3 shell commands (ctrl+o to expand)
+
+● The PNGs weren't recovered: the textures live in .godot/imported, so they need
+  filename globs, which worked earlier. Recovering by name:
+
+  Read 3 files, ran 3 shell commands (ctrl+o to expand)
+
+● The sheets use index colors as expected. Next I'm working out how Tile.gd
+  picks a frame from resources_sheet (12×12 frames of 24 px), plus the size and
+  placement of each chamber sprite. · summary
+
+  Ran 4 shell commands (ctrl+o to expand)
+
+● I'm pulling the sprite's hframes, vframes and offsets from the scenes so the
+  sheet indexes correctly, starting with the iron, water, cobalt and gadget
+  frame sets. · summary
+
+  Ran 1 shell command (ctrl+o to expand)
+
+❯ by the way, its fine if we just render one map of each.  dont know if that    
+  makes anything easier (e.g. by running the godot code to render an actual map 
+  to png, rather than in js.) up to you                                         
+
+● I'm checking whether cop can render here, since rendering with the real game
+  code needs a display, and if it can't I'll use a virtual one (Xvfb). · summary
+  Ran 1 shell command (ctrl+o to expand)
+
+● Cop has Xvfb, so I'm recovering the full Godot project there to try a real
+  render, starting with a check that the game's autoloads run under stock Godot
+  4.3. · summary
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Recovery brought back 2.4 GB with only 2 irrelevant plugin failures, and I
+  skipped the audio to save disk. I'm now running the Godot 4.3 editor headless
+  to build the texture cache. · summary
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● The import finished in 42 s, and the remaining compile errors come from the
+  missing PlayFab and Steam GDExtensions. If your project has their .gdextension
+  configs, I'll copy their .so libraries next to the binary. · summary
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● PlayFab and Steam are compiled into the game's custom engine, so I'll run the
+  real binary with a patched pck that adds my render script, starting with a
+  boot smoke test. · summary
+
+  Ran 1 shell command (ctrl+o to expand)
+
+❯ an option could also be for me to launch the game and you screenshot??  up to 
+  youu again                                                                    
+
+  Ran 1 shell command, searched memories (ctrl+o to expand)
+
+● The game binary needs its bundled .so libraries next to it on cop; I only
+  copied the pck and the executable. Copying them and re-running the probe:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● The game binary loads my script, and the parse error is my bug, since that
+  rendering call doesn't exist in 4.3. I'm turning off Sentry crash reporting
+  for these runs before I continue. · summary
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● I need to confirm whether the earlier crash report was sent and whether the
+  saves in cop's app_userdata/Dome Keeper belong to you, since my runs could
+  touch them. · summary
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Your real saves on cop are untouched, since only logs and sentry changed. One
+  crash report was probably uploaded to the developers' Sentry along with that
+  run's log, and I can't undo that, so I'm blanking the DSN and redirecting the
+  user-data folder next. · summary
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Now a reusable script on cop that patches the pck and runs a render script.
+  Re-running the fixed probe through it will confirm the override took effect:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● All game autoloads start cleanly in the real binary, with 25 assignments
+  loaded and the data going to the separate folder. Next I'll check what the
+  Backend telemetry autoload sends at boot, so render runs don't report fake
+  play sessions. · summary
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+● Telemetry is already disabled in this build, so I'll block the PlayFab login
+  by blanking its title ID in the override. Next I'm checking how Map.init
+  builds the visible map so the render script can use one of our generated maps.
+  · summary
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● I'm rendering the map by filling a MapData, placing chambers as LandingStage
+  does, and initializing the game's Map.tscn in a large SubViewport before
+  revealing it and saving a PNG. Next I'll write the reveal and remove
+  functions. · summary
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+● The render script will load the real MapData scene with a generated map, place
+  chambers and biomes using the game's own functions, reveal every tile, and
+  save the frame. Plain dirt is cleared before init so only resources, chambers
+  and border rock show. · summary
+
+  Made 1 scratchpad edit +98 (ctrl+o to expand)
+
+● I'm writing an exporter that uses the same crop and sample map as
+  build_app.py, and moving that selection into shared functions next. · summary
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● The autoload can't be referenced by name in this script, so I'll use the
+  constant directly. Crash reporting is confirmed off, since the crash handler
+  backend is disabled. · summary
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● My sed put the comment before the colon. Fixing it with a named constant:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● The real game rendered a frame at 2520×2832, and I'm now fixing about 8,000
+  missing run-property errors and compile-order problems in my script, starting
+  by looking at the image. · summary
+
+  Read 2 files (ctrl+o to expand)
+
+● The real game render now shows the actual resource sprites and biome colors,
+  with dirt removed. Two issues remain: the map is about 3 tiles off vertically,
+  and only one chamber sprite appears, likely due to missing run properties, so
+  I'm looking for the function that loads the defaults. · summary
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+● I'll call Data.reset() first, which is what the game does at the start of
+  every run, and load the Map script at runtime instead of naming its class:
+  Ran 1 shell command (ctrl+o to expand)
+
+● The calibration shows content offset by dx −12 px and dy +70 px, matching
+  mapToWorldOffset's (12, −72) to within a pixel. Two missing properties come
+  from upgrades, so I'm looking up their actual values next. · summary
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● I'll set the same revealdistance and per-layer health multiplier that
+  GameWorld uses at run start, and bake in the calibrated camera offset. Then
+  I'll re-render and re-calibrate to check the shift is zero. · summary
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● The render is error-free and aligned to the tile grid (shift 0, 0). Looking at
+  it:
+
+  Read 2 files (ctrl+o to expand)
+
+● The real-game render is working and aligned to the tile grid. Next I'm making
+  the render step patch the pck only when the script changes, rendering one
+  sample per config, switching build_app.py to these renders, and updating the
+  frontend to remove the "Which" dropdown and hardness field and use the
+  Kollektif font. · summary
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Now build_app.py: use the real renders, and drop the hand-drawn renderer and
+  the ranked layers.
+
+  Made 1 scratchpad edit +127, read 1 file (ctrl+o to expand)
+
+● Now the frontend: remove the rank dropdown and hardness field, and switch to
+  Kollektif.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Now the build/sync script: render first, build from the renders, and bundle
+  the font.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● The queue has reached the last guild config, so I'm starting the
+  render-and-build now for the finished batches in the background, which gives
+  you a working app before the rest complete. · summary
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● I've switched to rendering the backgrounds with the game itself. I didn't need
+  you to run the game and screenshot: the game's own executable runs on cop
+  under a virtual display and draws each map through its real Map scene. That
+  gives the game's actual palette, resource sprites, biome colors, cave
+  background and chamber sprites, shown as if "reveal resources" had been done
+  (every plain dirt tile mined). I checked the test render against the map data:
+  it lines up with the tile grid exactly, so the overlay, rulers and hover
+  match. Each mode gets one rendered map.
+
+  Your other points:
+  - Mean hardness: it really is about 2 everywhere. The generator rebalances
+    hardness on every map, so averaging thousands of maps gives a flat result. I
+    removed it.
+  - "Which" dropdown: removed.
+  - Font: the game's menus use Kollektif (gui/fonts/Kollektif.ttf). I copied it
+    out of your install and bundled it with the app.
+
+  Two things you should know:
+  - One crash report was probably sent to the developers. Early in testing, a
+    script error made the game crash on cop, and its built-in crash reporter
+    (Sentry) most likely uploaded a report with that run's game log. Since then,
+    crash reporting and the online-services login are switched off for these
+    runs.
+  - Your saves on cop are untouched. You have real Dome Keeper saves on cop
+    (April–July). They weren't changed, and render runs now write to a separate
+    folder (~/.local/share/DomeKeeperRender).
+
+  The generation queue crashed after its first new config: the analysis step
+  failed on configs with no relic. I fixed it and restarted it, and it's now on
+  the last guild configs. Relic Hunt, co-op and Prestige are still to come.
+
+  A background job is now rendering the finished configs and rebuilding the app
+  into ~/resources/domekeepermaps/app/index.html on this machine. Configs whose
+  maps aren't generated yet won't appear in the app until I rebuild it once the
+  queue finishes.
+
+✻ Brewed for 42m 36s · done 1:36 AM
+
+※ recap: I'm building a zoomable Dome Keeper map-odds viewer, now rendering each mode's background map with the real game and rebuilding the app. Next, once the remaining map batches finish generating, I'll rebuild so every mode appears.
+
+● Background command "Render finished configs, build app, sync locally"
+completed (exit code 0)
+
+  Listed 1 directory (ctrl+o to expand)
+
+● 11 guild configs are rendered and built. Screenshotting the local app to check
+  it:
+
+  Read 2 files, ran 1 shell command (ctrl+o to expand)
+
+● The rebuilt app works, with the game-rendered map and Kollektif text, and the
+  "Which" dropdown and hardness field removed. I'm queuing the final rebuild for
+  after the remaining batches finish. · summary
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● The app at ~/resources/domekeepermaps/app/index.html now has real
+  game-rendered maps for all 25 guild challenges. I opened it in a browser and
+  checked the overview and a zoomed view.
+
+  - Map art: each background is drawn by the game itself, with the "reveal
+    resources" look you asked for. You see the real iron, water and cobalt
+    sprites, chamber sprites, biome colors and cave background, with all plain
+    dirt mined. It lines up with the tile grid exactly, so the rulers and hover
+    tile match the overlay.
+  - Font: the UI uses Kollektif, the game's menu font, bundled with the app.
+  - Removed: the "Which" dropdown and the mean-hardness field (hardness averages
+    out to about 2 everywhere).
+
+  Relic Hunt (4 sizes × None/Maze/Triple Supplements), co-op and Prestige are
+  still generating on cop. A background job will render one map for each when
+  the queue finishes and rebuild the app in the same place; until then those
+  modes don't appear in the Mode dropdown. I'll check the result when it's done.
+
+✻ Cooked for 50s · done 1:48 AM
+
+※ recap: You wanted a map viewer showing where gadgets and supplements spawn, and guild challenges are done with real game-rendered maps. Next, a background job renders and adds Relic Hunt, co-op and Prestige when cop finishes generating.
+
+❯ looking good, but the gadgets/supplements should not be covered by rock.      
+                                                                                
+  is it expensive to store some of the maps in the app?                         
+
+● Checking how chambers open in the game, and how big the renders are on disk:
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+● Chambers open once their tiles are dug out, switching to the OPEN sprite. I'm
+  clearing their tiles, rock nodes and mask cutouts in the render next. 
+  · summary
+
+  Read 1 file, ran 1 shell command (ctrl+o to expand)
+
+● The chambers now render open, though a dark strip of rock is left under the
+  gadget chamber because the generator places 5 chamber cells but the cover
+  lists only 4. I'm digging out the leftover chamber-type cells next. · summary
+
+  Ran 1 shell command (ctrl+o to expand)
+
+❯ move the "field" to a second row of toggles beneath the current ones          
+  (gadgets, supplements, relic, ...) and use the resource sprite for each       
+  button.  (map footprint has no image on its button).  als update gadget,      
+  supplements, relic, ... buttons to use their sprites as well.                 
+                                                                                
+  the whole top toolbar can be made 75% taller to help fit                      
+
+  Read 1 file (ctrl+o to expand)
+
+● The chamber cleanup is done; next I'll crop the toolbar icons from game
+  renders and clear the existing renders for a rebuild. · summary
+
+  Read 1 file, ran 1 shell command (ctrl+o to expand)
+● The sprite sheet's resource icons and relic switch look good, but the gadget,
+  supplement and relic sprites sit off-center in their crops. I'm pulling wider
+  crops to find each one's true position. · summary
+
+  Read 1 file, ran 1 shell command (ctrl+o to expand)
+
+● The sprite offsets and crop sizes were measured from the zoomed crops. I'm
+  updating the cropper with them next. · summary
+
+  Ran 1 shell command (ctrl+o to expand)
+
+❯ also the dome render is pretty plain looking and in the wrong spot (it should 
+  be on the surface)                                                            
+
+  Read 1 file (ctrl+o to expand)
+
+● The icons now render correctly, but the dome is still a placeholder above the
+  entrance shaft at the crop's top edge. I'm adding sky headroom and swapping in
+  the game's actual dome sprite, remapped through the game palette, starting by
+  locating that sprite and its placement. · summary
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● The dome is built from three layered sprites, and LevelStage places it at
+  world.getDomePosition(). I'm now finding that position and the sprite offsets
+  within the dome scene. · summary
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● I'll set up the dome and world scenes the same way LevelStage does, checking
+  its code next. · summary
+
+  Ran 3 shell commands (ctrl+o to expand)
+
+● I'm placing the world scene and dome in LevelStage to match my render's
+  coordinates, and adding 10 tiles of headroom above the map so the surface, sky
+  and dome fit in frame. · summary
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● The stored grids start at y = −3, so the 10-tile headroom would produce
+  negative indices. I'm padding them with empty rows in a shared loader used by
+  both the build and the render export. · summary
+
+  Read 1 file, ran 1 shell command (ctrl+o to expand)
+
+● The real dome now renders above the entrance shaft, though the black sky
+  behind it is outside my offscreen capture. Next I'm enlarging the toolbar to
+  three rows and removing my placeholder dome. · summary
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+● Now hook the icon crop into the build (taken from the Projectile Hell render)
+  and run a rebuild of the finished configs with the new renders (open chambers,
+  dome, headroom):
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+● The rebuild is running in the background, one render per finished config.
+
+  On storing more maps: it's cheap. Each game render is a 0.2–0.5 MB PNG. Ten
+  maps per mode across ~30 modes comes to roughly 100–150 MB. The one-time
+  rendering cost is about a minute per map as I run it now (mostly game
+  startup); rendering several maps per startup would cut that to roughly 15 s
+  each. So 10 per mode is about an hour of rendering on cop. If you want it, I'd
+  add a "next map" button that steps through them with each seed shown. How
+  many per mode?
+
+  Changes since your last message, all in the build that's running now:
+  - Chambers open: gadget, supplement, relic and switch chambers are dug out and
+    shown open, the way they look after you excavate them. I checked a zoomed
+    render and no rock covers them.
+  - Dome: the game's own dome is drawn on the surface above the entrance shaft,
+    with 10 tiles of sky added above the map so it's in frame. The sky is plain
+    black; the world's sky scenery doesn't come through in my offscreen render.
+  - Toolbar: now three rows, about 75% taller:
+    - mode controls, opacity, Map and Smooth;
+    - Chambers: gadget, supplement, relic and switch toggles;
+    - Resources: iron, water and cobalt toggles, plus a text-only Map footprint
+      toggle. These can be combined.
+
+    All the icons are the game's sprites cropped out of a render, so they're in
+    the game's palette.
+
+✻ Sautéed for 8m 39s · done 2:06 AM
+
+❯ how complicated would either storing the maps, or regenerating them in JS be? 
+  (either storing tile locations or the generating logic)                       
+                                                                                
+  thoughts?                                                                     
+
+● Both are feasible, but they cost very different amounts.
+
+  Storing the maps: easy, and I already have them. Every generated map's full
+  tile grid is saved on cop.
+  - Size: one map's resource layer is about 20 KB raw and 2–4 KB compressed,
+    since it's mostly empty space and dirt. A few hundred maps per mode is 1–2
+    MB per mode; all 20k Projectile Hell maps would be about 60 MB, too much for
+    a page.
+  - Drawing: the page would draw each map from tile data, using the game sprites
+    I already cropped and the biome colors from the game palette. That looks
+    close to the game render but simpler: no shader edge effects, and chambers
+    drawn as single sprites.
+  - Effort: a few hours.
+
+  Regenerating in JS: hard, but possible to get exact. I'd have to port about
+  1,000 lines of generator plus the engine behavior it depends on:
+  - Godot's random number generator, including its exact randf_range and
+    randi_range math.
+  - FastNoiseLite. A JS port exists, but it must match the settings Godot passes
+    to it.
+  - The order Godot returns tile cells in: a hash map that keeps insertion
+    order, including what happens when a cell is erased and set again.
+  - The tie-breaking of Godot's sort_custom.
+  - Single-precision Vector2 math mixed with double-precision floats.
+
+  Any one of these being slightly off silently produces different maps. The
+  upside is that I can test exhaustively: 20k+ real maps per mode with known
+  seeds to compare against. It would also run fast, around 50–100 ms per map in
+  the browser.
+
+  The more useful idea: your game log already records the seed when each run
+  starts (Seed:458828460 in logs/godot*.log, which is how I validated the
+  generator). So "show me this run's map" doesn't need a JS port. A small script
+  can read the newest seed from your log, run the exact generator I already
+  have (Godot headless, about 1 s), and open the result in the viewer. That's a
+  few hours of work, it's exact by construction, and it's probably the biggest
+  gameplay win. To be clear, though: it shows where everything is on your
+  current map, so it's effectively a map reveal, unlike the probability maps.
+
+  My recommendation:
+  1. For variety: store a few hundred maps per mode as tile data, plus 10 game
+     renders per mode. Easy, and a "next map" button would step through them.
+  2. For your actual run: read the seed from the log and generate that exact
+     map. Easy and exact.
+  3. JS port: only if you want it to work with no local tools at all. Days of
+     work, but it can be verified.
+
+  Want me to do 1 and 2?
+
+✻ Baked for 24s · done 2:08 AM
+
+❯ ok lets just store 20 maps of each (and add a randomize button).  should also 
+  indicate a version somewhere that tracks the game version                     
+
+● Let me check where the game stores its version string:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● The game's version is v5.0.8.14 and the Steam build id is 25038893, and both
+  will be recorded. I'm stopping the running rebuild so I can change the render
+  script to draw each mode's 20 maps in a single startup. · summary
+
+● Stop Task
+  ⎿  /tmp/claude-1000/-home-evan--steam-debian-installation-steamapps-commo
+     n-Dome-Keeper/b15ebbc1-7d54-4504-a1c0-8c449b648382/scratchpad/scripts/
+     build_and_sync.sh 2>… · stopped
+
+● Stop Task
+  ⎿  S=/tmp/claude-1000/-home-evan--steam-debian-installation-steamapps-com
+     mon-Dome-Keeper/b15ebbc1-7d54-4504-a1c0-8c449b648382/scratchpad;
+     $S/scripts/wait_queue.sh… · stopped
+
+● Stopping the local jobs may leave the remote render running, so I'll check cop
+  and stop any leftover render processes there (the generation queue keeps
+  running):
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+● Leftover renders are stopped and the generation queue is still running; the
+  exit-255 was just pkill matching its own SSH session. Next I'm writing the
+  multi-map render script, which renders each (input, output) pair in turn and
+  records the game version. · summary
+
+  Read 1 file, ran 1 shell command (ctrl+o to expand)
+
+● Now the exporter (20 sample maps per mode), the per-mode render loop, and
+  build_app support for multiple backgrounds:
+
+  Ran 1 shell command (ctrl+o to expand)
+● The Steam build id lives in this machine's Steam manifest, so
+  build_and_sync.sh will read it here and pass it to the build on cop:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Now the frontend: a random-map button with a "map k/20 · seed" label, and the
+  game version shown under the title.
+
+  Ran 3 shell commands (ctrl+o to expand)
+
+● Before rendering everything, a quick test of the multi-map loop with 2 maps in
+  one startup, to confirm the teardown between maps works and the version gets
+  written:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+❯ can I see a preview of a JS-drawn map first?                                  
+
+● Both maps rendered correctly in the two-map test, but the version field came
+  out empty because it gets filled later in boot, which I'm fixing. I'm holding
+  the full render until I've built a JS-drawn preview of map #2 to compare
+  against the game's own render. · summary
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● I have both maps and renders. A prep script will sample colors and sprite
+  tiles from map #1, and a small JS page will draw map #2 with them as a fair
+  test. · summary
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Biomes 0–2 came out missing because the input grid still marks dirt as dirt;
+  it's only cleared at render time. Sampling should count dirt tiles as ground:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● The JS drawing page is next: it fills biome ground with light tile noise, adds
+  a lighter border rim, varies resource sprites per tile, and centers chamber
+  sprites and the entrance dome. · summary
+
+  Made 1 scratchpad edit +109, read 1 file, ran 1 shell command (ctrl+o to expand)
+
+● Background command "Test rendering two maps in one game boot" completed (exit
+code 0)
+
+● Here's the comparison:
+  /tmp/claude-1000/-home-evan--steam-debian-installation-steamapps-common-Dome-K
+  eeper/b15ebbc1-7d54-4504-a1c0-8c449b648382/scratchpad/jsprev_shot.png. The
+  live page is
+  /tmp/claude-1000/-home-evan--steam-debian-installation-steamapps-common-Dome-K
+  eeper/b15ebbc1-7d54-4504-a1c0-8c449b648382/scratchpad/jsprev/preview.html, and
+  you can zoom into it.
+
+  The left side is drawn in JS from the tile grid alone; the right is the game's
+  render of the same map.
+
+  What matches: the map shape, every iron/water/cobalt sprite, the chamber
+  sprites and their positions, and the dome. These use the game's real pixels,
+  so they look the same as the render.
+
+  What's off:
+  - Biome colors are in the wrong order. Which color each layer gets is chosen
+    per seed by the game's Map.generateBiomes(). For the preview I reused the
+    other map's order, so the left side's layers are colored differently. This
+    is easy to fix: store a 7-entry color list per map, computed with the game's
+    own function.
+  - The ground looks flatter. The game's background shader adds mottled texture
+    and soft lit edges, which my JS version only approximates with noise and a 3
+    px rim. With a little more work I could tile the game's actual cave
+    texture, but it won't fully match.
+
+  What each approach costs:
+  - Game renders: about 0.4 MB per map, so 20 per mode is roughly 250 MB.
+    Rendering takes about 3–4 minutes per mode.
+  - JS from tile data: a few KB per map, so it can store hundreds of maps per
+    mode in a few MB and load instantly. It looks like the left side, with the
+    biome colors fixed.
+
+  Which do you prefer for the 20 maps per mode: game renders (exact look, about
+  250 MB), or JS-drawn from tile data (slightly simpler look, tiny, and could
+  hold many more maps)? I could also combine them: JS-drawn maps for the
+  random-map button, plus one game render per mode as the default background.
+
+✻ Worked for 14m 34s · done 2:24 AM
+
+※ recap: I'm building a local viewer showing where gadgets and supplements spawn across Dome Keeper modes, and I just showed you a JS-drawn map next to the game's own render. Next I need your pick: game renders, JS-drawn, or both for the 20 maps per mode.
+
+❯ ok drop render idea for now.  just one map.  is app/ up to date?              
+
+● No, app/ isn't up to date. The last completed sync is from before the open
+  chambers, real dome, new toolbar and version display; my later rebuilds were
+  stopped and never synced. I'll go back to one game-rendered map per mode,
+  remove the random-map button, keep the version label, fix the empty version,
+  and rebuild. First, where GameWorld.version gets set:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● It's set by the main Game scene from a Version class, which my script skips.
+  I'll read that class directly:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● The game is at version 5.0.8.14 (sha d7395c4), read from
+  res://game/version.gd. Next I'll switch to a single sample map and remove the
+  random button, keeping the seed visible as a label. · summary
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Now I'll rebuild in the background. It renders and syncs everything finished
+  so far, then waits for the generation queue and does a final pass for the
+  remaining modes.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● app/ isn't up to date yet. The copy at ~/resources/domekeepermaps/app/ is
+  still an older build: chambers covered by rock, no real dome, the old toolbar
+  and no version label.
+
+  I've gone back to one game-rendered map per mode and dropped the multi-map and
+  random-map work. The JS-drawn preview stays a prototype in the scratchpad and
+  isn't in the app.
+
+  A background rebuild is running in two passes:
+  1. Now: renders and syncs every mode whose maps are generated: all 25 guild
+     challenges and the Relic Hunt sizes finished so far. These get the latest
+     changes:
+     - chambers dug out and shown open;
+     - the game's dome on the surface;
+     - the three-row toolbar with sprite toggles;
+     - a version label reading game v5.0.8.14 · Steam build 25038893. The empty
+       version is fixed: it's now read from the game's own version.gd.
+  2. After the queue finishes: the remaining Relic Hunt, co-op and Prestige
+     modes get rendered and added.
+
+  I'll tell you when each pass lands.
+
+✻ Brewed for 55s · done 2:31 AM
+
+※ recap: You asked for a map viewer showing where gadgets and supplements spawn. I'm rebuilding app/ with game-rendered maps, open chambers, the real dome, the new toolbar and the version label. When it finishes I'll confirm the app is current, then add the remaining Relic Hunt, co-op and Prestige modes.
+
+❯ some other things, would like a "rooms" dropdown that shows the probable      
+  locations of room, and would like the rooms to show on the map.               
+                                                                                
+  would also like important scripts to go in a scripts dir so a future agent    
+  can redo this easily on new game versions (with sensitive info redacted)      
+
+● By "rooms" I take it you mean the special caves (seed cave, water cave, drone
+  cave, scanner, teleporter and so on); correct me if you meant something else.
+  The game places those at level start with Map.generateCaves(), which needs the
+  full game, so it can't run in my standalone generator. Reading it in full:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+❯ ill go to sleep now so ask any critical Qs                                    
+
+● The game picks cave positions with the unseeded global random generator, so
+  only which caves appear is reproducible from the seed; that's fine for
+  probability maps. I'm now checking whether the cave list depends on the world
+  (world1–7). · summary
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Only Tree Farm overrides the cave list; everywhere else the defaults apply:
+  all caves allowed, at most one per biome layer, and at least 10 tiles from the
+  center line. The world (world1–7) doesn't change anything. So there's only a
+  little to ask. If you don't answer, I'll go with the defaults:
+
+  1. "Rooms" = the special caves (Seed, Water, Drone, Scanner, Teleporter,
+     Mushroom, Cobalt, Iron Tree, Bomb, Helmet and so on), shown as a
+     probability layer, with a dropdown to pick one or all. They'd also be drawn
+     in each mode's rendered map. Default: yes.
+  2. Nest cave (pet chamber): in Relic Hunt, the game only adds it while you
+     still have pets to unlock, which depends on your save. Default: include it 
+     as its own dropdown entry, labeled "only while pets remain to unlock".
+  3. Where the scripts go: I'll consolidate everything needed into
+     ~/resources/domekeepermaps/scripts/ on cop, plus a copy at the same path on
+     this machine. That covers decompile, harness, generation queue, game
+     render, app build and frontend, with a README written for a future agent
+     covering the redo-on-new-version steps and the gotchas: crash reporting,
+     separate user dir, calibration. Machine names, your email and the game's
+     Sentry DSN get redacted. Default: plain directory, no git remote, nothing 
+     pushed anywhere.
+
+  Plan for tonight: add cave placement by running the game's own generateCaves
+  over the existing maps (no regeneration needed), add the rooms layer, dropdown
+  and rendered caves, then finish the remaining modes and rebuild app/. I'll
+  leave a short status for the morning.
+
+✻ Crunched for 44s · done 2:38 AM
+
+※ recap: You're building a zoomable Dome Keeper map-odds app, and I'm adding a rooms (special caves) layer with dropdown and rendered caves, plus a scripts folder for future game versions. Next, confirm my three default answers so I can finish tonight.
+❯ /context 
+  ⎿  Context Usage
+     ⛀ ⛁ ⛁ ⛁ ⛀ ⛀ ⛀ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁   Opus 5.5
+     ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁   claude-opus-5-5
+     ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁   508k/1m tokens (51%)
+     ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ 
+     ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁   Estimated usage by category
+     ⛁ ⛁ ⛁ ⛁ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶   ⛁ System prompt: 3.1k tokens (0.3%)
+     ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶   ⛁ System tools: 18.3k tokens (1.8%)
+     ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶   ⛁ MCP server instructions: 717 tokens (0.1%)
+     ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶   ⛁ Memory files: 380 tokens (0.0%)
+     ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛀   ⛁ Skills: 6.6k tokens (0.7%)
+                                               ⛁ Messages: 478.8k tokens (47.9%)
+                                               ⛁ Compact buffer: 3k tokens (0.3%)
+                                               ⛶ Free space: 489k (48.9%)
+
+     MCP tools · /mcp (loaded on-demand)
+     └ 16 tools · 0 tokens
+
+     Skills · /skills
+     └ 39 skills · 6.6k tokens
+
+     /context all to expand
+
+      Suggestions
+      ℹ Read results using 2.1m tokens (209%) → save ~626.5k
+        Use offset and limit parameters to read only the sections you need. Avoid re-reading entire files when you only need a few lines.
+
+      ℹ Autocompact is disabled
+        Without autocompact, you will hit context limits and lose the conversation. Enable it in /config or use /compact manually.
+
+❯ write a worklog in the project folder so I can resume in another session      
+  tomorrow.  can cop continue if I close this machine?                          
+
+● Skill(worklog)
+  ⎿  Successfully loaded skill
+
+● The generation queue on cop will keep running if you close this machine, but
+  the rebuild job runs from here over SSH and would die with it, so I'm moving
+  it onto cop as a detached job. I'm also copying my source out of the /tmp
+  scratchpad into the project folder, since a reboot could wipe it. · summary
+
+● Stop Task
+  ⎿  S=/tmp/claude-1000/-home-evan--steam-debian-installation-steamapps-com
+     mon-Dome-Keeper/b15ebbc1-7d54-4504-a1c0-8c449b648382/scratchpad;
+     timeout 60 ssh cop 'cd ~/… · stopped
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Sources are now on this machine, so the remote renders are stopped. Next I'll
+  point the build script at the project and start a detached finishing job on
+  cop that renders, adds icons and font, and builds the app. · summary
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● The finishing job is running detached on cop (the exit 124 is just the SSH
+  session waiting on it). Now the worklog:
+
+● Write(~/resources/domekeepermaps/WORK.md)
+  ⎿  Wrote 29 lines to ~/resources/domekeepermaps/WORK.md
+      1 # 2026-11-09 - Map generation analysis + viewer app
+      2 
+      3 Layout: same tree on local (`~/resources/domekeepermaps`) and cop
+        . Source of truth for code is local (`scripts/ render/ harness/ a
+        pp_src/`); data, renders, game copy, decompiled project live only
+         on cop. `scripts/build_and_sync.sh` pushes code to cop, builds, 
+        pulls `app/` back.
+      4 
+      5 **Pipeline**
+      6 - Decompile: GDRE Tools v2.7.4 (`tools/gdre_tools.x86_64`) on `ga
+     … +24 lines (~4 KB) (ctrl+o to expand)
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● The worklog is at ~/resources/domekeepermaps/WORK.md, with a copy on cop. It
+  covers the pipeline, the gotchas, what's running overnight and your two
+  pending requests.
+
+  You can close this machine; cop will keep going. Both jobs there run detached
+  from this session, and I checked they're both alive:
+  - Generation queue: on the last co-op batch, then Prestige.
+  - Finishing job: waits for the queue, renders every mode with the game, and
+    builds the app on cop. Progress goes to data/finish.log.
+
+  What changed so it survives:
+  - Code is out of /tmp. It had been in a temporary folder that a reboot could
+    wipe; it's now in ~/resources/domekeepermaps/ here.
+  - The rebuild no longer runs from this machine. It's the cop-side finishing
+    job above.
+
+  To resume tomorrow:
+  1. Check data/finish.log on cop for "app built".
+  2. Copy the app over: rsync -a --delete cop:resources/domekeepermaps/app/ 
+     ~/resources/domekeepermaps/app/
+  3. Start the rooms (special caves) layer and the scripts/README cleanup, which
+     haven't been started yet. If you didn't answer my three questions, the
+     worklog records the defaults I proposed.
+
+✻ Cooked for 2m 6s · done 2:48 AM
+
+❯ go ahead and move everything to cop:~/resources, ill resume there             
+
+● I'll copy the code over to cop without touching cop's app/, which the
+  overnight job is building and which is newer than the local copy. Then I'll
+  update the worklog so cop is the single source of truth.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Everything is on cop now, in ~/resources/domekeepermaps. That covers the code
+  (scripts/, render/, harness/, app_src/, prototypes/) and the updated WORK.md,
+  next to the data, renders, game copy and decompiled project that were already
+  there. I didn't overwrite cop's app/, because the overnight job is still
+  building it there. WORK.md now says to work directly on cop and marks the old
+  local-driven sync scripts as obsolete. cop also has chromium, so the
+  screenshot checks work there.
+
+  Overnight, the generation queue and the finishing job are both still running
+  on cop. data/finish.log is still empty because the job is waiting for the
+  queue to finish.
+
+  I left the local copy in ~/resources/domekeepermaps alone. It's now just a
+  backup (code plus an older app/), and you can delete it whenever you like.
+
+  When you pick this up on cop:
+  1. Check that data/finish.log ends with "app built".
+  2. Open app/index.html.
+  3. Start on the two open items in WORK.md: the rooms layer and the
+     scripts/README cleanup.
+
+✻ Churned for 25s · done 2:49 AM
+
+● Background shell command didn't finish before the previous session ended

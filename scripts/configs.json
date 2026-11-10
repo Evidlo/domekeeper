@@ -1,0 +1,711 @@
+[
+ {
+  "tag": "guild_default_norelic",
+  "group": "Guild assignment",
+  "archetype": "assignment-default",
+  "ops": [
+   "relics=0"
+  ],
+  "n": 3000,
+  "challenges": [
+   {
+    "id": "showdown",
+    "title": "Showdown"
+   },
+   {
+    "id": "cobaltcontribution",
+    "title": "Cobalt Contribution"
+   },
+   {
+    "id": "emergency",
+    "title": "Emergency"
+   }
+  ],
+  "game_mode": {
+   "mode": "assignments",
+   "assignment": "showdown"
+  },
+  "cave_variants": [
+   "base"
+  ]
+ },
+ {
+  "tag": "guild_default_norelic_nocobalt",
+  "group": "Guild assignment",
+  "archetype": "assignment-default",
+  "ops": [
+   "cobalt_rate*=0.0",
+   "relics=0"
+  ],
+  "n": 3000,
+  "challenges": [
+   {
+    "id": "ironcontribution",
+    "title": "Iron Contribution"
+   }
+  ],
+  "game_mode": {
+   "mode": "assignments",
+   "assignment": "ironcontribution"
+  },
+  "cave_variants": [
+   "base"
+  ]
+ },
+ {
+  "tag": "guild_default",
+  "group": "Guild assignment",
+  "archetype": "assignment-default",
+  "ops": [
+   "relics=1"
+  ],
+  "n": 3000,
+  "challenges": [
+   {
+    "id": "inversegravity",
+    "title": "Upside Down"
+   },
+   {
+    "id": "projectilehell",
+    "title": "Projectile Hell"
+   },
+   {
+    "id": "weapondefect",
+    "title": "Defective Weapon"
+   },
+   {
+    "id": "heavyhitters",
+    "title": "Heavy Hitters"
+   },
+   {
+    "id": "weakcarry",
+    "title": "Logistical Problem"
+   },
+   {
+    "id": "weakwalls",
+    "title": "High Risk"
+   },
+   {
+    "id": "monstermasses",
+    "title": "Monster Masses"
+   },
+   {
+    "id": "weakmining",
+    "title": "Mining Problem"
+   },
+   {
+    "id": "megacreeps",
+    "title": "Survival of the Fittest"
+   },
+   {
+    "id": "instagip",
+    "title": "Brutal Monsters"
+   },
+   {
+    "id": "harmfuliron",
+    "title": "Hazardous Iron"
+   },
+   {
+    "id": "unpredictable",
+    "title": "Broken Comms"
+   }
+  ],
+  "game_mode": {
+   "mode": "assignments",
+   "assignment": "inversegravity"
+  },
+  "cave_variants": [
+   "base"
+  ]
+ },
+ {
+  "tag": "guild_maze",
+  "group": "Guild assignment",
+  "archetype": "assignment-maze",
+  "ops": [
+   "relics=1"
+  ],
+  "n": 3000,
+  "challenges": [
+   {
+    "id": "maze",
+    "title": "Maze"
+   }
+  ],
+  "game_mode": {
+   "mode": "assignments",
+   "assignment": "maze"
+  },
+  "cave_variants": [
+   "base"
+  ]
+ },
+ {
+  "tag": "guild_dense-iron",
+  "group": "Guild assignment",
+  "archetype": "assignment-dense-iron",
+  "ops": [
+   "relics=1"
+  ],
+  "n": 3000,
+  "challenges": [
+   {
+    "id": "denseiron",
+    "title": "Dense Iron"
+   }
+  ],
+  "game_mode": {
+   "mode": "assignments",
+   "assignment": "denseiron"
+  },
+  "cave_variants": [
+   "base"
+  ]
+ },
+ {
+  "tag": "guild_softrock-sparseresources",
+  "group": "Guild assignment",
+  "archetype": "assignment-softrock-sparseresources",
+  "ops": [
+   "relics=1"
+  ],
+  "n": 3000,
+  "challenges": [
+   {
+    "id": "bigmapsparseresources",
+    "title": "Barren Lands"
+   }
+  ],
+  "game_mode": {
+   "mode": "assignments",
+   "assignment": "bigmapsparseresources"
+  },
+  "cave_variants": [
+   "base"
+  ]
+ },
+ {
+  "tag": "guild_hardrock-manyholes",
+  "group": "Guild assignment",
+  "archetype": "assignment-hardrock-manyholes",
+  "ops": [
+   "relics=1"
+  ],
+  "n": 3000,
+  "challenges": [
+   {
+    "id": "superhardrockwithholes",
+    "title": "Swiss Cheese"
+   }
+  ],
+  "game_mode": {
+   "mode": "assignments",
+   "assignment": "superhardrockwithholes"
+  },
+  "cave_variants": [
+   "base"
+  ]
+ },
+ {
+  "tag": "guild_rare-iron",
+  "group": "Guild assignment",
+  "archetype": "assignment-rare-iron",
+  "ops": [
+   "relics=1"
+  ],
+  "n": 3000,
+  "challenges": [
+   {
+    "id": "rareiron",
+    "title": "Iron Shortage"
+   }
+  ],
+  "game_mode": {
+   "mode": "assignments",
+   "assignment": "rareiron"
+  },
+  "cave_variants": [
+   "base"
+  ]
+ },
+ {
+  "tag": "guild_minorvision",
+  "group": "Guild assignment",
+  "archetype": "assignment-minorvision",
+  "ops": [
+   "relics=1"
+  ],
+  "n": 3000,
+  "challenges": [
+   {
+    "id": "minorvision",
+    "title": "Darkness"
+   }
+  ],
+  "game_mode": {
+   "mode": "assignments",
+   "assignment": "minorvision"
+  },
+  "cave_variants": [
+   "base"
+  ]
+ },
+ {
+  "tag": "guild_acidrain",
+  "group": "Guild assignment",
+  "archetype": "assignment-acidrain",
+  "ops": [
+   "relics=1"
+  ],
+  "n": 3000,
+  "challenges": [
+   {
+    "id": "acidrain",
+    "title": "Acid Rain"
+   }
+  ],
+  "game_mode": {
+   "mode": "assignments",
+   "assignment": "acidrain"
+  },
+  "cave_variants": [
+   "base"
+  ]
+ },
+ {
+  "tag": "guild_tree-farm",
+  "group": "Guild assignment",
+  "archetype": "assignment-tree-farm",
+  "ops": [
+   "relics=1"
+  ],
+  "n": 3000,
+  "challenges": [
+   {
+    "id": "treefarm",
+    "title": "Tree Farm"
+   }
+  ],
+  "game_mode": {
+   "mode": "assignments",
+   "assignment": "treefarm"
+  },
+  "cave_variants": [
+   "base"
+  ]
+ },
+ {
+  "tag": "guild_logistics_norelic_nocobalt",
+  "group": "Guild assignment",
+  "archetype": "assignment-logistics",
+  "ops": [
+   "cobalt_rate*=0.0",
+   "relics=0"
+  ],
+  "n": 3000,
+  "challenges": [
+   {
+    "id": "logistics",
+    "title": "Logistical Nightmare"
+   }
+  ],
+  "game_mode": {
+   "mode": "assignments",
+   "assignment": "logistics"
+  },
+  "cave_variants": [
+   "base"
+  ]
+ },
+ {
+  "tag": "relichunt_small",
+  "group": "Relic Hunt",
+  "archetype": "regular-small",
+  "ops": [],
+  "n": 3000,
+  "size": "small",
+  "modifier": null,
+  "game_mode": {
+   "mode": "relichunt",
+   "mapsize": "regular-small",
+   "modifiers": ""
+  },
+  "cave_variants": [
+   "base"
+  ]
+ },
+ {
+  "tag": "relichunt_small_maze",
+  "group": "Relic Hunt",
+  "archetype": "regular-small",
+  "ops": [
+   "max_tile_count_deviation+=0.05",
+   "viability_large_noise_strength+=420",
+   "viability_small_noise_strength=0",
+   "viability_large_noise=res://content/map/generation/noises/viability_maze.tres"
+  ],
+  "n": 3000,
+  "size": "small",
+  "modifier": "Maze",
+  "game_mode": {
+   "mode": "relichunt",
+   "mapsize": "regular-small",
+   "modifiers": "worldmodifiermaze"
+  },
+  "cave_variants": [
+   "base"
+  ]
+ },
+ {
+  "tag": "relichunt_small_domesupplements",
+  "group": "Relic Hunt",
+  "archetype": "regular-small",
+  "ops": [
+   "powercore_first_depth*=0.8",
+   "powercore_depth_step*=0.65",
+   "powercores*=3"
+  ],
+  "n": 3000,
+  "size": "small",
+  "modifier": "Triple Supplements",
+  "game_mode": {
+   "mode": "relichunt",
+   "mapsize": "regular-small",
+   "modifiers": "worldmodifierdomesupplements"
+  },
+  "cave_variants": [
+   "base"
+  ]
+ },
+ {
+  "tag": "relichunt_medium",
+  "group": "Relic Hunt",
+  "archetype": "regular-medium",
+  "ops": [],
+  "n": 3000,
+  "size": "medium",
+  "modifier": null,
+  "game_mode": {
+   "mode": "relichunt",
+   "mapsize": "regular-medium",
+   "modifiers": ""
+  },
+  "cave_variants": [
+   "base",
+   "nest"
+  ]
+ },
+ {
+  "tag": "relichunt_medium_maze",
+  "group": "Relic Hunt",
+  "archetype": "regular-medium",
+  "ops": [
+   "max_tile_count_deviation+=0.05",
+   "viability_large_noise_strength+=420",
+   "viability_small_noise_strength=0",
+   "viability_large_noise=res://content/map/generation/noises/viability_maze.tres"
+  ],
+  "n": 3000,
+  "size": "medium",
+  "modifier": "Maze",
+  "game_mode": {
+   "mode": "relichunt",
+   "mapsize": "regular-medium",
+   "modifiers": "worldmodifiermaze"
+  },
+  "cave_variants": [
+   "base",
+   "nest"
+  ]
+ },
+ {
+  "tag": "relichunt_medium_domesupplements",
+  "group": "Relic Hunt",
+  "archetype": "regular-medium",
+  "ops": [
+   "powercore_first_depth*=0.8",
+   "powercore_depth_step*=0.65",
+   "powercores*=3"
+  ],
+  "n": 3000,
+  "size": "medium",
+  "modifier": "Triple Supplements",
+  "game_mode": {
+   "mode": "relichunt",
+   "mapsize": "regular-medium",
+   "modifiers": "worldmodifierdomesupplements"
+  },
+  "cave_variants": [
+   "base",
+   "nest"
+  ]
+ },
+ {
+  "tag": "relichunt_large",
+  "group": "Relic Hunt",
+  "archetype": "regular-large",
+  "ops": [],
+  "n": 3000,
+  "size": "large",
+  "modifier": null,
+  "game_mode": {
+   "mode": "relichunt",
+   "mapsize": "regular-large",
+   "modifiers": ""
+  },
+  "cave_variants": [
+   "base",
+   "nest"
+  ]
+ },
+ {
+  "tag": "relichunt_large_maze",
+  "group": "Relic Hunt",
+  "archetype": "regular-large",
+  "ops": [
+   "max_tile_count_deviation+=0.05",
+   "viability_large_noise_strength+=420",
+   "viability_small_noise_strength=0",
+   "viability_large_noise=res://content/map/generation/noises/viability_maze.tres"
+  ],
+  "n": 3000,
+  "size": "large",
+  "modifier": "Maze",
+  "game_mode": {
+   "mode": "relichunt",
+   "mapsize": "regular-large",
+   "modifiers": "worldmodifiermaze"
+  },
+  "cave_variants": [
+   "base",
+   "nest"
+  ]
+ },
+ {
+  "tag": "relichunt_large_domesupplements",
+  "group": "Relic Hunt",
+  "archetype": "regular-large",
+  "ops": [
+   "powercore_first_depth*=0.8",
+   "powercore_depth_step*=0.65",
+   "powercores*=3"
+  ],
+  "n": 3000,
+  "size": "large",
+  "modifier": "Triple Supplements",
+  "game_mode": {
+   "mode": "relichunt",
+   "mapsize": "regular-large",
+   "modifiers": "worldmodifierdomesupplements"
+  },
+  "cave_variants": [
+   "base",
+   "nest"
+  ]
+ },
+ {
+  "tag": "relichunt_huge",
+  "group": "Relic Hunt",
+  "archetype": "regular-huge",
+  "ops": [],
+  "n": 3000,
+  "size": "huge",
+  "modifier": null,
+  "game_mode": {
+   "mode": "relichunt",
+   "mapsize": "regular-huge",
+   "modifiers": ""
+  },
+  "cave_variants": [
+   "base",
+   "nest"
+  ]
+ },
+ {
+  "tag": "relichunt_huge_maze",
+  "group": "Relic Hunt",
+  "archetype": "regular-huge",
+  "ops": [
+   "max_tile_count_deviation+=0.05",
+   "viability_large_noise_strength+=420",
+   "viability_small_noise_strength=0",
+   "viability_large_noise=res://content/map/generation/noises/viability_maze.tres"
+  ],
+  "n": 3000,
+  "size": "huge",
+  "modifier": "Maze",
+  "game_mode": {
+   "mode": "relichunt",
+   "mapsize": "regular-huge",
+   "modifiers": "worldmodifiermaze"
+  },
+  "cave_variants": [
+   "base",
+   "nest"
+  ]
+ },
+ {
+  "tag": "relichunt_huge_domesupplements",
+  "group": "Relic Hunt",
+  "archetype": "regular-huge",
+  "ops": [
+   "powercore_first_depth*=0.8",
+   "powercore_depth_step*=0.65",
+   "powercores*=3"
+  ],
+  "n": 3000,
+  "size": "huge",
+  "modifier": "Triple Supplements",
+  "game_mode": {
+   "mode": "relichunt",
+   "mapsize": "regular-huge",
+   "modifiers": "worldmodifierdomesupplements"
+  },
+  "cave_variants": [
+   "base",
+   "nest"
+  ]
+ },
+ {
+  "tag": "coop2_small",
+  "group": "Co-op (2 players)",
+  "archetype": "regular-small",
+  "ops": [
+   "max_tile_count_deviation+=0.15",
+   "tileCount*=1.15",
+   "width*=1.09",
+   "depth*=1.18",
+   "first_biome_size*=1.3",
+   "biome_max_size*=1.15",
+   "biome_size_multiplier*=1.075",
+   "biome_size_addition*=1.15",
+   "depth*=1.4",
+   "width*=1.3",
+   "gadget_first_depth*=1.5",
+   "gadget_depth_step*=1.8",
+   "water_rate*=0.9"
+  ],
+  "n": 3000,
+  "size": "small",
+  "game_mode": {
+   "mode": "coop",
+   "mapsize": "regular-small"
+  },
+  "cave_variants": [
+   "base"
+  ]
+ },
+ {
+  "tag": "coop2_medium",
+  "group": "Co-op (2 players)",
+  "archetype": "regular-medium",
+  "ops": [
+   "max_tile_count_deviation+=0.15",
+   "tileCount*=1.15",
+   "width*=1.09",
+   "depth*=1.18",
+   "first_biome_size*=1.3",
+   "biome_max_size*=1.15",
+   "biome_size_multiplier*=1.075",
+   "biome_size_addition*=1.15",
+   "depth*=1.4",
+   "width*=1.3",
+   "gadget_first_depth*=1.5",
+   "gadget_depth_step*=1.8",
+   "water_rate*=0.9"
+  ],
+  "n": 3000,
+  "size": "medium",
+  "game_mode": {
+   "mode": "coop",
+   "mapsize": "regular-medium"
+  },
+  "cave_variants": [
+   "base"
+  ]
+ },
+ {
+  "tag": "coop2_large",
+  "group": "Co-op (2 players)",
+  "archetype": "regular-large",
+  "ops": [
+   "max_tile_count_deviation+=0.15",
+   "tileCount*=1.15",
+   "width*=1.09",
+   "depth*=1.18",
+   "first_biome_size*=1.3",
+   "biome_max_size*=1.15",
+   "biome_size_multiplier*=1.075",
+   "biome_size_addition*=1.15",
+   "depth*=1.4",
+   "width*=1.3",
+   "gadget_first_depth*=1.5",
+   "gadget_depth_step*=1.8",
+   "water_rate*=0.9"
+  ],
+  "n": 3000,
+  "size": "large",
+  "game_mode": {
+   "mode": "coop",
+   "mapsize": "regular-large"
+  },
+  "cave_variants": [
+   "base"
+  ]
+ },
+ {
+  "tag": "coop2_huge",
+  "group": "Co-op (2 players)",
+  "archetype": "regular-huge",
+  "ops": [
+   "max_tile_count_deviation+=0.15",
+   "tileCount*=1.15",
+   "width*=1.09",
+   "depth*=1.18",
+   "first_biome_size*=1.3",
+   "biome_max_size*=1.15",
+   "biome_size_multiplier*=1.075",
+   "biome_size_addition*=1.15",
+   "depth*=1.4",
+   "width*=1.3",
+   "gadget_first_depth*=1.5",
+   "gadget_depth_step*=1.8",
+   "water_rate*=0.9"
+  ],
+  "n": 3000,
+  "size": "huge",
+  "game_mode": {
+   "mode": "coop",
+   "mapsize": "regular-huge"
+  },
+  "cave_variants": [
+   "base"
+  ]
+ },
+ {
+  "tag": "prestige_10k",
+  "group": "Prestige",
+  "archetype": "prestige-10k",
+  "ops": [],
+  "n": 1500,
+  "game_mode": {
+   "mode": "prestige"
+  },
+  "cave_variants": [
+   "base"
+  ]
+ },
+ {
+  "tag": "prestige_20k",
+  "group": "Prestige",
+  "archetype": "prestige-20k",
+  "ops": [],
+  "n": 1500,
+  "game_mode": {
+   "mode": "prestige"
+  },
+  "cave_variants": [
+   "base"
+  ]
+ }
+]
