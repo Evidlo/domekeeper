@@ -470,39 +470,71 @@ function setupInteraction() {
     onHover(ev);
   }, { passive: false });
 
+  // Gesture state is re-anchored whenever the number of touching pointers changes, so
+  // lifting one finger of a pinch continues as a pan from the current view.
   let drag = null;
   const pointers = new Map();
+  const relPos = (p) => {
+    const r = vp.getBoundingClientRect();
+    return [p[0] - r.left, p[1] - r.top];
+  };
+  const anchor = () => {
+    const pts = [...pointers.values()];
+    const v = state.view;
+    if (pts.length === 0) { drag = null; return; }
+    const [a, b] = [pts[0], pts[1] || pts[0]];
+    drag = {
+      ...drag, n: pts.length, tx: v.tx, ty: v.ty, s: v.s,
+      mid: relPos([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]),
+      d: Math.max(1, Math.hypot(a[0] - b[0], a[1] - b[1])),
+    };
+  };
+  const hideHover = () => {
+    state.hover = null; $("tooltip").hidden = true; $("hover-tile").style.display = "none";
+    drawRulers();
+  };
   vp.addEventListener("pointerdown", (ev) => {
     vp.setPointerCapture(ev.pointerId);
     pointers.set(ev.pointerId, [ev.clientX, ev.clientY]);
-    drag = { x: ev.clientX, y: ev.clientY, tx: state.view.tx, ty: state.view.ty, pinch: null };
-    if (pointers.size === 2) {
-      const [a, b] = [...pointers.values()];
-      drag.pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]), s: state.view.s };
-    }
+    const start = drag ? drag.start : [ev.clientX, ev.clientY];
+    drag = { start, tap: pointers.size === 1 };
+    anchor();
     vp.classList.add("dragging");
+    if (ev.pointerType !== "mouse") hideHover();
   });
   vp.addEventListener("pointermove", (ev) => {
     if (pointers.has(ev.pointerId)) pointers.set(ev.pointerId, [ev.clientX, ev.clientY]);
-    if (drag && pointers.size === 2 && drag.pinch) {
-      const [a, b] = [...pointers.values()];
-      const r = vp.getBoundingClientRect();
-      const d = Math.hypot(a[0] - b[0], a[1] - b[1]);
-      zoomAt((drag.pinch.s * d / drag.pinch.d) / state.view.s, (a[0] + b[0]) / 2 - r.left, (a[1] + b[1]) / 2 - r.top);
-    } else if (drag && pointers.size === 1) {
-      state.view.tx = drag.tx + ev.clientX - drag.x;
-      state.view.ty = drag.ty + ev.clientY - drag.y;
+    if (drag) {
+      const pts = [...pointers.values()];
+      const [a, b] = [pts[0], pts[1] || pts[0]];
+      const mid = relPos([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]);
+      const [lo, hi] = sLimits();
+      const d = Math.max(1, Math.hypot(a[0] - b[0], a[1] - b[1]));
+      const s = drag.n === 2 ? Math.min(hi, Math.max(lo, drag.s * d / drag.d)) : drag.s;
+      const k = s / drag.s;
+      state.view = {
+        s,
+        tx: mid[0] - (drag.mid[0] - drag.tx) * k,
+        ty: mid[1] - (drag.mid[1] - drag.ty) * k,
+      };
       applyView();
+      const moved = Math.hypot(ev.clientX - drag.start[0], ev.clientY - drag.start[1]);
+      if (moved > 8) drag.tap = false;
     }
-    onHover(ev);
+    if (ev.pointerType === "mouse") onHover(ev);
   });
   const end = (ev) => {
-    pointers.delete(ev.pointerId);
-    if (pointers.size === 0) { drag = null; vp.classList.remove("dragging"); }
+    if (!pointers.delete(ev.pointerId)) return;
+    const tap = drag && drag.tap && pointers.size === 0 && ev.type === "pointerup";
+    anchor();
+    if (pointers.size === 0) vp.classList.remove("dragging");
+    if (tap && ev.pointerType !== "mouse") onHover(ev);
   };
   vp.addEventListener("pointerup", end);
   vp.addEventListener("pointercancel", end);
-  vp.addEventListener("pointerleave", () => { state.hover = null; $("tooltip").hidden = true; $("hover-tile").style.display = "none"; drawRulers(); });
+  vp.addEventListener("pointerleave", (ev) => {
+    if (ev.pointerType === "mouse") hideHover();
+  });
 
   $("zoom-in").addEventListener("click", () => { const [w, h] = viewportSize(); zoomAt(1.5, w / 2, h / 2); });
   $("zoom-out").addEventListener("click", () => { const [w, h] = viewportSize(); zoomAt(1 / 1.5, w / 2, h / 2); });
