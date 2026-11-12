@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Domekeeper Probabilities</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<aside class="sidebar" id="sidebar">
+  <div class="side-section brand-box">
+    <div class="brand">Domekeeper Probabilities</div>
+    <div class="version" id="version">game version unknown</div>
+  </div>
+
+  <div class="side-section">
+    <div class="form">
+      <label class="ctl"><span>Mode</span><select id="mode"></select></label>
+      <label class="ctl" id="ctl-challenge"><span>Challenge</span><select id="challenge"></select></label>
+      <label class="ctl" id="ctl-size"><span>Map size</span><select id="size"></select></label>
+      <label class="ctl" id="ctl-modifier"><span>Modifier</span><select id="modifier"></select></label>
+      <label class="ctl" id="ctl-prestige"><span>Variant</span><select id="prestige"></select></label>
+    </div>
+  </div>
+
+  <div class="side-section">
+    <h3>Chambers</h3>
+    <div class="chips" id="chamber-chips" role="group" aria-label="Chamber layers"></div>
+    <h3>Resources</h3>
+    <div class="chips" id="field-chips" role="group" aria-label="Resource layers"></div>
+    <h3>Rooms</h3>
+    <div class="chips" id="room-chips" role="group" aria-label="Room layers"></div>
+    <label class="ctl toggle" id="ctl-nest"
+      title="Relic Hunt adds the nest room while there are still pets to find; it takes the place of another room">
+      <input id="nest" type="checkbox" checked><span>Pets left to find</span></label>
+  </div>
+
+  <div class="side-section view-controls">
+    <label class="ctl"><span>Opacity</span>
+      <input id="opacity" type="range" min="0.1" max="1" step="0.05" value="1"></label>
+    <label class="ctl toggle"><input id="show-map" type="checkbox" checked><span>Map</span></label>
+    <label class="ctl toggle"><input id="smooth" type="checkbox" checked><span>Smooth</span></label>
+  </div>
+
+  <div class="side-section" id="legend"></div>
+  <div class="side-section note">
+    <strong>Sides alternate.</strong> Each gadget and supplement is placed on the opposite side of the
+    previous one almost every time (see “opposite side” below), so once you find one, look on the other
+    side for the next.
+  </div>
+  <div class="side-section" id="stats"></div>
+  <div class="side-section about" id="about"></div>
+</aside>
+
+<main class="viewer" id="viewer">
+  <canvas id="ruler-top" class="ruler top"></canvas>
+  <canvas id="ruler-left" class="ruler left"></canvas>
+  <div class="corner" title="Tile coordinates: x from the dome, y = depth">tiles</div>
+  <div class="viewport" id="viewport">
+    <div class="stage" id="stage">
+      <img id="bg" alt="Sample generated map" draggable="false">
+      <canvas id="overlay"></canvas>
+      <div id="hover-tile" class="hover-tile"></div>
+    </div>
+    <div id="tooltip" class="tooltip" hidden></div>
+    <div id="loading" class="loading">Loading…</div>
+    <div class="sample-label" id="sample-label"></div>
+  </div>
+  <div class="zoom-ctl">
+    <button id="zoom-in" aria-label="Zoom in">+</button>
+    <button id="zoom-out" aria-label="Zoom out">−</button>
+    <button id="zoom-fit" aria-label="Fit map">Fit</button>
+  </div>
+</main>
+
+<script src="app.js"></script>
+<script src="data/index.js"></script>
+<script src="data/version.js"></script>
+</body>
+</html>
